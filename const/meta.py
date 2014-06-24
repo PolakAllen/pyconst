@@ -5,13 +5,6 @@ from itertools import count
 Metadata = count(1)
 MODE_LESS = next(Metadata)
 
-object_nomode_getattribute = object.__getattribute__
-object_nomode_setattr = object.__setattr__
-object_nomode_delattr = object.__delattr__
-list_nomode_getitem = list.__getitem__
-list_nomode_append = list.append
-list_nomode_pop = list.pop
-
 def push_metastack(val):
   t = current_thread()
   try:
