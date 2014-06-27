@@ -1,4 +1,4 @@
-from const.mode import *
+#from const.mode import *
 from const.proxy import Immutable, nomutate
 from const.target import Target as Params
 from functools import wraps
