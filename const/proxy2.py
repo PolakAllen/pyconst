@@ -46,7 +46,6 @@ class ProxyClassFactory:
   noautoproxy = {"__dict__", "__class__", "__init__", "__qualname__", "__flags__",
     "__bases__","__name__", "__mro__", "__setattr__","__getattribute__",
     "__getattr__", "__new__"}
-  immutable_primatives = {str, int, float, complex}
 
   def __init__(factory):
     factory.class_cache = {}
@@ -69,31 +68,15 @@ class ProxyClassFactory:
     else:
       factory.proxy_attr(proxy, proxied, name)
 
-  def Get(factory, *args): return FunctionNature.SafeNone
-  def Set(factory, *args): return FunctionNature.SafeNone
-  def Del(factory, *args): return FunctionNature.SafeNone
-  def Modify(factory, *args): return FunctionNature.SafeNone
-  def Iter(factory, *args): return FunctionNature.SafeNone
-
   def build_class(factory, proxied_class):
     try:
-      return factory.class_cache[id(proxied_class)]
+      return factory.class_cache[proxied_class]
     except KeyError:
       class Proxy:
         def __init__(self, *args, **kwargs):
           metadata = {}
           metadata["obj"] = proxied_class(*args, **kwargs)
-          metadata["self"] = self
           setattr(self, "__proxy__", metadata)
-
-        @classmethod
-        def __proxy__buildproxy(cls, obj):
-          proxy = Proxy.__new__(Proxy)
-          metadata = {}
-          metadata["obj"] = obj
-          metadata["self"] = proxy
-          setattr(proxy, "__proxy__", metadata)
-          return proxy
 
         @property
         def __dict__(self):
@@ -101,43 +84,29 @@ class ProxyClassFactory:
         @property
         def __class__(self):
           return _get(d_geti(_get(self,"__proxy__"),"obj"),"__class__")
-
         def __getattribute__(self, item):
-          if item == "__proxy__":
-            return _get(self,"__proxy__")
-          attr = _get(d_geti(_get(self,"__proxy__"),"obj"),item)
-          if type(attr) in factory.immutable_primatives: return attr
-          cls = factory.build_class(type(attr))
-          return cls.__proxy__buildproxy(attr)
+          return _get(d_geti(_get(self,"__proxy__"),"obj"),item)
 
-      try:
-        for name in set(proxied_class.__dict__) - factory.noautoproxy:
-          factory.proxy(Proxy, proxied_class, name)
-      except AttributeError: pass
-
+      for name in set(proxied_class.__dict__) - factory.noautoproxy:
+        factory.proxy(Proxy, proxied_class, name)
       for name in set(magicnames) - factory.noautoproxy:
         if hasattr(proxied_class, name):
           factory.proxy(Proxy, proxied_class, name)
 
-      for type_, attrs in c_level_overrides.items():
-        if issubclass(proxied_class, type_):
-          for method, nature in attrs.items():
-            if method not in factory.noautoproxy:
-              setattr(Proxy, method, 
-                  nature.make(getattr(factory, nature.__class__.__name__)))
-      factory.class_cache[id(proxied_class)] = Proxy
+      factory.class_cache[proxied_class] = Proxy
       return Proxy
-    if type(attr) in factory.immutable_primatives: return attr
 
 def infectious(CRTP):
   class InfectiousProxy(ProxyClassFactory, CRTP):
     def proxy_attr(factory, proxy, proxied, attrname):
+      print("proxying",attrname,"as property")
       @property
       def autoproxyattr(self):
         return getattr(self.__proxy__["obj"], attrname)
       setattr(proxy, attrname, autoproxyattr)
 
     def proxy_method(factory, proxy, proxied, methodname):
+      print("proxying",methodname,"as method")
       def do_method(self, obj, *args, **kwargs):
         getattr(obj, methodname)
         
@@ -151,6 +120,9 @@ def infectious(CRTP):
 
 @infectious
 class Immutable:
+  def Get(factory, *args): 
+    print("Getting", *args)
+    return FunctionNature.SafeNone
   def Modify(factory, *args): raise TypeError("class is immutable")
   def Set(factory, *args): raise TypeError("class is immutable")
 

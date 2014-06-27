@@ -7,17 +7,17 @@ class FunctionNature:
   SafeNone = type("Nill", (object,), {})()
   class Nature:
     """builds a composite function from the client, based on the specific Nature"""
-    def __init__(self, base_fn):
-      self.base_fn = base_fn
+    def __init__(nature, base_fn):
+      nature.base_fn = base_fn
 
-    def make(self, intercept_fn):
+    def make(nature, intercept_fn):
       def composite(*args, **kwargs):
-        intercept_result = self.intercept_fn(self.base_fn, args, kwargs)
-        self.handle(intercept_result, args, kwargs)
+        intercept_result = intercept_fn(nature.base_fn, args, kwargs)
+        return nature.handle(intercept_result, args, kwargs)
       return composite
 
     def handle(self, result, args, kwargs):
-      return self.base_fn(*args, **kwargs) if SafeNone != result else result
+      return self.base_fn(*args, **kwargs) if FunctionNature.SafeNone == result else result
 
   class Get(Nature): modifies = False
   class Set(Nature): modifies = True
@@ -78,3 +78,14 @@ for obj,fns in c_level_overrides.items():
     methodshortname = "_".join([shortnames[obj],shortnames.get(method,method)])
     fn = getattr(obj, method)
     Globals[methodfullname] = shortnames[methodshortname] = fn
+    # patch overrides to include the base function programmatically
+    c_level_overrides[obj][method] = nature(fn) 
+
+def apply_natures(to_modify, **natures):
+  for obj, fns in c_level_overrides.items():
+    for method,nature in fns.items():
+      if hasattr(to_modify, method):
+        print("Overriding", method)
+        setattr(to_modify, method,
+            nature.make(natures.get(nature.__class__.__name__, lambda *_:
+                FunctionNature.SafeNone)))
