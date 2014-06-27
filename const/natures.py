@@ -1,5 +1,5 @@
-from aptools.scopeinjector import Globals
-from aptools.objectdict import ObjectDict
+from const.scopeinjector import Globals
+from const.objectdict import ObjectDict
 
 class FunctionNature:
   # SafeNone should be returned if an intercept function doesn't want to be have
