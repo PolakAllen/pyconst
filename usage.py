@@ -1,7 +1,7 @@
 import const
 
 # a string is an immutable list
-@const.immutable
+@const.Immutable
 class String(list):
   def __init__(self, base_str):
     self[:] = list(base_str)
@@ -71,6 +71,76 @@ try:
   raise AssertionError("Whoops. Not supposed to be able to modify that")
 except TypeError as e: print("\t{}\n".format(e))
   
-print('Things that should be the same no matter the format:')
+print("""
+What about modification during iteration? 
+Note that strings aren't going to cut it, as we can only modify containers""")
+list_lists = [[],[],[]]
+@const.Immutable
+class ListLists(list):
+  def __init__(self, lists):
+    self[:] = list(lists)
+immutable_list_lists = ListLists([[],[],[]])
+for i in list_lists:
+  i.append('!')
+print("\n\t".join("""
+list_lists = [[],[],[]]
+@const.Immutable
+class ListLists(list):
+  def __init__(self, lists):
+    self[:] = list(lists)
+immutable_list_lists = ListLists([[],[],[]])
 
+for i in list_lists:
+  i.append('!')
+print(list_lists)
+""".split('\n')))
+print("\t>>>",list_lists)
+print("\n\t".join("""
+for i in immutable_list_lists:
+  i.append('!')
+""".split('\n')))
+try:
+  for i in immutable_list_lists:
+    i.append('!')
+  print(immutable_list_lists)
+  raise AssertionError("Whoops. Not supposed to be able to modify that")
+except TypeError as e: print("\t{}\n".format(e))
+
+
+print("We even prevent a class from modifying its own internals by default.")
+print("\n\t".join("""
+@const.Immutable
+class NoSelfModification:
+  def __init__(self):
+    self.static_attr = "Hello World"
+    self.container_attr = list("Hello World")
+  def mutate_static(self):
+    self.static_attr = "Mello World"
+  def mutate_container(self):
+    self.container_attr.append("!")
+no_self_mutate = NoSelfModification()
+no_self_mutate.mutate_static()
+""".split("\n")))
+
+@const.Immutable
+class NoSelfModification:
+  def __init__(self):
+    self.static_attr = "Hello World"
+    self.container_attr = {"Hello":"World"}
+  def mutate_static(self):
+    self.static_attr = "Mello World"
+  def mutate_container(self):
+    self.container_attr["World"] = "Hello"
+
+no_self_mutate = NoSelfModification()
+try:
+  no_self_mutate.mutate_static()
+  raise AssertionError("Whoops. Not supposed to be able to modify that")
+except TypeError as e: print("\t{}\n".format(e))
+
+print("\tno_set_mutate.mutate_container()")
+try:
+  no_self_mutate.mutate_container()
+  raise AssertionError("Whoops. Not supposed to be able to modify that")
+except TypeError as e: print("\t{}\n".format(e))
 

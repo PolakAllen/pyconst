@@ -1,11 +1,11 @@
-Forbidden
-=========
+Const
+=====
 
 Introduction
 ------------
 
 Assertions and metaproperties provide a mental framework from which we can 
-examine all developments in modern programming langauges and practices.
+examine all developments in modern programming languages and practices.
 
 This project is an experiment which seeks to build on our abstractions of modern
 practices, perhaps improving or extending existing paradigms, or perhaps 
@@ -25,6 +25,7 @@ What does it actually do?
 Right now, it's just a framework for modification validation
 
 We allow the user to assert their sanity when debugging
+As of version 0.1, only local class attributes are available for assertion
 
     @nomutate(globals,file)
     def function_that_might_be_mutating_a_global(...)
@@ -39,14 +40,14 @@ Why document it when you can contract it?
     @maymutate(self.var) # and implicitly, nomutate everything else
     def object_method(can_use_any_variable_name_as_self, ...)
 
-currently only mutations blocking works
+Currently only mutations blocking works
 mutation assertions can be bound to any object, list, dictionary
 mutation assertions can be bound to functions as well
 
 Why?
 ----
 
-Because we expect that these assertions could be violated. Accidently forgetting
+Because we expect that these assertions could be violated. Accidentally forgetting
 some part of the design, a typographical mistake, or perhaps some
 miscommunication.
 
@@ -64,16 +65,16 @@ Future Ideas
 
 Code reuse is a common concept in all languages, and an essential part of
 structured programming. The structure of larger programs is often dependent 
-upon strict enforment of the dependency graph, which is typically only 
+upon strict enforcement of the dependency graph, which is typically only 
 handled at the highest granularity of code divisions 
-(module, class, seperate files, etc.)
+(module, class, separate files, etc.)
 
 The external graph is such a concept at any level of resolution. It is the
-external dependecies, outside the given scope, which could be a block, a
+external dependencies, outside the given scope, which could be a block, a
 closure, a function, a class, etc. We use the word graph, as each item in the
 external graph from the given scope will also have an external graph, which
 rapidly expands to the complete body of executable code associated to that
-orginal scope.
+original scope.
 
 The external graph, or reachable code, is a source of many assertions we may
 want to make about a given block of code. For instance, we assume that most of
@@ -85,7 +86,7 @@ External graphs may get more use as a higher granularity dependency graph.
 
 2. Internal Graphs
 
-Internal graphs are a far more expermental analogous application of external
+Internal graphs are a far more experimental analogous application of external
 graphs. Internal graphs are concerned with any scope that allows definition and
 execution of other executable scopes.
 
@@ -101,7 +102,7 @@ reasons we would do so with external graphs. However, this implies a certain
 level of complexity of a given scope, which is likely to be discouraged by best
 practices. 
 
-An external graph may disreguard the specifics of an internal graph (treating
+An external graph may disregard the specifics of an internal graph (treating
 the entire internal graph as a single root node), though to be an adequate 
 external graph, must walk the internal graph as well. We can call a complete
 graph, that is to say, an iterative external graph from each of the lowest level
@@ -140,10 +141,10 @@ doing so will be very much dependent upon the specific behavior being validated.
 A method of providing such a functionality is experimented with in this project.
 We assume that all effects of a program or subprogram are within its side
 effects and functional return values. We also assume that the fastest, most
-efficent, and most reliable way to predict program behavior is to simply run the
+efficient, and most reliable way to predict program behavior is to simply run the
 program and look at the result.
 
-If we assume the above, we find sub-program sandboxing to be an efficent manner
+If we assume the above, we find sub-program sandboxing to be an efficient manner
 to proceed. That is to say, when we wish to validate functionality, we run the
 program in a special mode which virtualizes all operations. Global side effects
 (effects outside our program) are not executed until after validation of the
@@ -170,6 +171,6 @@ Our joinpoints of interest would be any valid location for an assertion. Our
 assertions come in two primary forms, stack based (modal), and
 invariant (static).
 
-In addition, assertions allow us to reason about program behavior. A sufficently
-advanced assertion framework may generate a new paradigm that affords a seperate
+In addition, assertions allow us to reason about program behavior. A sufficiently
+advanced assertion framework may generate a new paradigm that affords a separate
 specification of behaviors.

@@ -81,11 +81,3 @@ for obj,fns in c_level_overrides.items():
     # patch overrides to include the base function programmatically
     c_level_overrides[obj][method] = nature(fn) 
 
-def apply_natures(to_modify, **natures):
-  for obj, fns in c_level_overrides.items():
-    for method,nature in fns.items():
-      if hasattr(to_modify, method):
-        print("Overriding", method)
-        setattr(to_modify, method,
-            nature.make(natures.get(nature.__class__.__name__, lambda *_:
-                FunctionNature.SafeNone)))

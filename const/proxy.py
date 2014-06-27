@@ -1,177 +1,106 @@
-from const.mode import *
-from aptools.magicnames import magicnames
-import natures
-import functools as ft
-"""
-Proxy can be initiated on a per-class or per-attribute/function level
+from const.natures import c_level_overrides, FunctionNature
+from const.magicnames import magicnames
 
-At the class level, Proxy will simply return a pure ProxyClass. The ProxyClass
-has the same __mro__ as the proxied class, but does not call any super methods,
-delegating the construction of the object to the overriden class
+safe_primatives = { str, int, float, complex }
+class ProxyMetadata:
+  def __init__(self, obj, proxy_type, context=None):
+    self.obj = obj
+    self.proxy_type = proxy_type
+    self.context = context if context else [(obj,None,tuple(),{})]
 
-At the method level, Proxy can do a few things:
-  pass ProxyClass(self) instead of self
-  pass additional proxy targets at invokation
-  wrap the return value
-
-At the attribute level, Proxy can do similar things as the method level, due to
-descriptors. We wrap any existing descriptors, and (given that descriptors take
-no arguments) we can return the attribute wrapped in a proxy.
-"""
-
-for name,val in shortnames.items():
-  globals()[name] = val
+  def __call__(self, value, new_context):
+    return self.proxy_type(value, self.proxy_type, 
+        self.context + [(value,) + new_context])
+do_override = {"__str__","__repr__"}
+class BaseProxy:
+  def __init__(self, obj, proxy_type, context=None):
+    self.__dict__["__proxy__"] = ProxyMetadata(obj, proxy_type, context)
+    for name in set(magicnames) - (set(dir(proxy_type)) - do_override):
+      if hasattr(obj, name):
+        object.__setattr__(self, name, getattr(obj, name))
 
 
-class ProxyClassFactory:
-  """
-  A Base class for proxy class factories
+  @property
+  def __class__(self):
+    return self.__proxy__.obj.__class__
 
-  Proxies are meant to be transparent wrappers to a proxied object.
-  To be more efficient, proxy classes are made per proxied object class.
-  This is because there are many __ methods which cannot be dynamically proxied,
-  and most be found in the class definition.
-
-  Non-__ methods are proxied dynamically, as normal
-
-  We abuse descriptors here. All autoproxied elements use a descriptor attribute
-  (if its not callable). Otherwise it delegates to the method directly
-
-  This creates some interesting issues. noautoproxy is a blacklist of attributes
-  which should not be proxied as it causes catastrophic failure
-
-  The only reliable way to differentiate the Proxied class is to test for a
-  __proxy__ attribute, which is a local namespace for storing proxy data
-  """
-  noautoproxy = {"__dict__", "__class__", "__init__", "__qualname__", "__flags__",
-    "__bases__","__name__", "__mro__", "__setattr__","__getattribute__",
-    "__getattr__", "__new__"}
-  immutable_primatives = {str, int, float, complex}
-
-  def __init__(factory):
-    factory.class_cache = {}
-
-  def proxy_attr(factory, proxy, proxied, attrname):
-    @property
-    def autoproxyattr(self):
-      return _get(d_geti(_get(self,"__proxy__"),"obj"), attrname)
-    setattr(proxy, attrname, autoproxyattr)
-
-  def proxy_method(factory, proxy, proxied, methodname):
-    def autoproxymethod(self, *args, **kwargs):
-      return _get(d_geti(_get(self,"__proxy__"),"obj"), methodname)(*args, **kwargs)
-    setattr(proxy, methodname, autoproxymethod)
-
-  def proxy(factory, proxy, proxied, name):
-    attr = getattr(proxied, name)
-    if callable(attr):
-      factory.proxy_method(proxy, proxied, name)
-    else:
-      factory.proxy_attr(proxy, proxied, name)
-
-  def Get(factory, *args): return FunctionNature.SafeNone
-  def Set(factory, *args): return FunctionNature.SafeNone
-  def Del(factory, *args): return FunctionNature.SafeNone
-  def Modify(factory, *args): return FunctionNature.SafeNone
-  def Iter(factory, *args): return FunctionNature.SafeNone
-
-  def build_class(factory, proxied_class):
+  def __getattribute__(self, item):
     try:
-      return factory.class_cache[id(proxied_class)]
-    except KeyError:
-      class Proxy:
-        def __init__(self, *args, **kwargs):
-          metadata = {}
-          metadata["obj"] = proxied_class(*args, **kwargs)
-          metadata["self"] = self
-          setattr(self, "__proxy__", metadata)
+      return object.__getattribute__(self, item)
+    except AttributeError: 
+      proxy = object.__getattribute__(self,"__proxy__")
+      value = getattr(proxy.obj, item)
+      if type(value) in safe_primatives: return value
+      return proxy(value, (getattr, (proxy.obj, item), {}))
 
-        @classmethod
-        def __proxy__buildproxy(cls, obj):
-          proxy = Proxy.__new__(Proxy)
-          metadata = {}
-          metadata["obj"] = obj
-          metadata["self"] = proxy
-          setattr(proxy, "__proxy__", metadata)
-          return proxy
+  def __getitem__(self, item):
+    proxy = object.__getattribute__(self,"__proxy__")
+    value = proxy.obj.__getitem__(item)
+    if type(value) in safe_primatives: return value
+    return proxy(value, (proxy.obj.__getitem__, (item,), {}))
 
-        @property
-        def __dict__(self):
-          return _get(d_geti(_get(self,"__proxy__"),"obj"),"__dict__")
-        @property
-        def __class__(self):
-          return _get(d_geti(_get(self,"__proxy__"),"obj"),"__class__")
+  def __iter__(self):
+    proxy = object.__getattribute__(self,"__proxy__")
+    for count,i in enumerate(proxy.obj.__iter__()):
+      yield proxy(i, (proxy.obj.__iter__, (count,), {}))
 
-        def __getattribute__(self, item):
-          if item == "__proxy__":
-            return _get(self,"__proxy__")
-          attr = _get(d_geti(_get(self,"__proxy__"),"obj"),item)
-          if type(attr) in factory.immutable_primatives: return attr
-          cls = factory.build_class(type(attr))
-          return cls.__proxy__buildproxy(attr)
+  def __call__(self, *args, **kwargs):
+    proxy = object.__getattribute__(self,"__proxy__")
+    if hasattr(proxy.obj,"__self__"):
+      parent = proxy.context[-2][0]
+      fn_name = proxy.obj.__name__
+      parent_proxy = proxy(parent, ("__call__",args,kwargs))
+      fn = getattr(parent.__class__,fn_name)
+      return fn(parent_proxy, *args, **kwargs)
+    return proxy.obj(*args, **kwargs)
+  def __repr__(self):
+    proxy = object.__getattribute__(self,"__proxy__")
+    return proxy.obj.__repr__()
 
-      try:
-        for name in set(proxied_class.__dict__) - factory.noautoproxy:
-          factory.proxy(Proxy, proxied_class, name)
-      except AttributeError: pass
+def proxy_class(SpecializedProxy):
+  def decorator(proxied_cls):
+    class Proxy(SpecializedProxy):
+      def __init__(self, *args, **kwargs):
+        super().__init__(proxied_cls(*args, **kwargs), SpecializedProxy)
+    return Proxy
+  decorator.__inner__ = SpecializedProxy
+  return decorator
 
-      for name in set(magicnames) - factory.noautoproxy:
-        if hasattr(proxied_class, name):
-          factory.proxy(Proxy, proxied_class, name)
+def mutation_denied(self, *args, **kwargs): 
+  raise TypeError("{} is immutable in this instance".format(self.__class__.__name__))
 
-      for type_, attrs in c_level_overrides.items():
-        if issubclass(proxied_class, type_):
-          for method, nature in attrs.items():
-            if method not in factory.noautoproxy:
-              setattr(Proxy, method, 
-                  nature.make(getattr(factory, nature.__class__.__name__)))
-      factory.class_cache[id(proxied_class)] = Proxy
-      return Proxy
-    if type(attr) in factory.immutable_primatives: return attr
+@proxy_class
+class Immutable(BaseProxy):
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
 
-def infectious(CRTP):
-  class InfectiousProxy(ProxyClassFactory, CRTP):
-    def proxy_attr(factory, proxy, proxied, attrname):
-      @property
-      def autoproxyattr(self):
-        return getattr(self.__proxy__["obj"], attrname)
-      setattr(proxy, attrname, autoproxyattr)
+for objtype, methods in c_level_overrides.items():
+  for method, nature in methods.items():
+    if nature.modifies:
+      setattr(Immutable.__inner__, method, mutation_denied)
 
-    def proxy_method(factory, proxy, proxied, methodname):
-      def do_method(self, obj, *args, **kwargs):
-        getattr(obj, methodname)
-        
-      def autoproxymethod(self):
-        obj = self.__proxy__["obj"]
-        return ft.partial(do_method, self, obj)
+def proxy(factory, proxy, proxied, name):
+  attr = getattr(proxied, name)
+  if callable(attr):
+    factory.proxy_method(proxy, proxied, name)
+  else:
+    factory.proxy_attr(proxy, proxied, name)
+  
+  
 
-      #autoproxymethod.__get__ = do_method
-      setattr(proxy, methodname, autoproxymethod)
-  return InfectiousProxy
+def nomutate(field):
+  return Immutable.__inner__(field, Immutable.__inner__)
 
-@infectious
-class Immutable:
-  def Modify(factory, *args): raise TypeError("class is immutable")
-  def Set(factory, *args): raise TypeError("class is immutable")
-
-immutable = Immutable().build_class
-def nomutate(fn_or_target, *targets):
-  def nomutate_inner(fn, targets=[]):
-    def do_fn(*args, **kwargs):
-      # bind the names to the arguments
-      # wrap targeted arguments
-      # marshal arguments to function in same manner as passed originally
-      pass
-    return do_fn
-
-  if not isinstance(fn_or_target, target.Target):
-    return nomutate_inner(fn)
-  else: 
-    return ft.partial(nomutate_inner, targets=[fn_or_target] + targets)
-
-@immutable
+@Immutable
 class Test:
-  a = 1
+  a = []
   def __init__(self):
-    self.b = 2
-    self.l = []
+    self.b = []
+  def mutateb(self):
+    self.b.append(1)
+
+class Test2:
+  a = []
+  def __init__(self):
+    self.b = []
+    self.c = nomutate([1,2,3])

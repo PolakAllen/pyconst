@@ -41,7 +41,7 @@ def object_delattr(obj, attr):
     if objmode: return objmode(obj, attr)
   return object_nomode_delattr(obj, attr)
     
-#curse(object, "__getattribute__", object_getattribute)
-#curse(object, "__setattr__", object_setattr)
-#curse(object, "__delattr__", object_delattr)
+curse(object, "__getattribute__", object_getattribute)
+curse(object, "__setattr__", object_setattr)
+curse(object, "__delattr__", object_delattr)
 

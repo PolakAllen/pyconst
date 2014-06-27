@@ -1,5 +1,5 @@
 from const.mode import *
-import const.proxy
+from const.proxy import Immutable, nomutate
 from const.target import Target as Params
 from functools import wraps
 import types
@@ -18,5 +18,10 @@ import types
 # TODO
 @mutates(Target...) fn
   override a prior immutable proxy
+
+We still need __metastack__ for making assertions about mutations in variables
+outside of the parameters and class members of a given block. No features
+currently rely on __metastack__, but its being left as part of the framework for
+specifying metadata
 """
 
